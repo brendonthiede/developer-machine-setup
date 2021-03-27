@@ -1,0 +1,319 @@
+{
+  "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "adminUsername": {
+      "type": "string"
+    },
+    "adminPassword": {
+      "type": "secureString"
+    },
+    "virtualMachineName": {
+      "type": "string",
+      "defaultValue": "devmachine"
+    },
+    "virtualMachineSize": {
+      "type": "string",
+      "defaultValue": "Standard_D8s_v3",
+      "allowedValues": [
+        "Standard_D2s_v3",
+        "Standard_D4s_v3",
+        "Standard_D8s_v3",
+        "Standard_D16s_v3"
+      ]
+    },
+    "imageReference": {
+      "type": "object",
+      "defaultValue": {
+        "publisher": "MicrosoftWindowsDesktop",
+        "offer": "Windows-10",
+        "sku": "rs5-pro",
+        "version": "latest"
+      }
+    },
+    "storageAccountType": {
+      "type": "string",
+      "defaultValue": "Premium_LRS",
+      "allowedValues": [
+        "Standard_LRS",
+        "Premium_LRS"
+      ]
+    },
+    "dataDiskSize": {
+      "type": "int",
+      "defaultValue": 256
+    }
+  },
+  "variables": {
+    "location": "[resourceGroup().location]",
+    "rgName": "[resourceGroup().name]",
+    "resourceBaseName": "[if(endsWith(variables('rgName'), '-rg'), take(variables('rgName'), sub(length(variables('rgName')), 3)), variables('rgName'))]",
+    "tags": {
+      "owner": "devops",
+      "purpose": "testing"
+    },
+    "virtualNetworkName": "[concat(variables('resourceBaseName'), '-vnet')]",
+    "diagnosticsStorageAccountName": "[concat(take(replace(variables('resourceBaseName'), '-', ''), 20), 'diag')]",
+    "networkInterfaceName": "[concat(parameters('virtualMachineName'), '-nic')]",
+    "networkSecurityGroupName": "[concat(parameters('virtualMachineName'), '-nsg')]",
+    "publicIpAddressName": "[concat(parameters('virtualMachineName'), '-ip')]",
+    "nsgId": "[resourceId(variables('rgName'), 'Microsoft.Network/networkSecurityGroups', variables('networkSecurityGroupName'))]",
+    "vnetId": "[resourceId(variables('rgName'),'Microsoft.Network/virtualNetworks', variables('virtualNetworkName'))]",
+    "subnetRef": "[concat(variables('vnetId'), '/subnets/default')]",
+    "autoShutdownStatus": "Enabled",
+    "autoShutdownTime": "23:00",
+    "autoShutdownTimeZone": "Eastern Standard Time",
+    "autoShutdownNotificationStatus": "Disabled",
+    "autoShutdownNotificationTimeInMinutes": 15,
+    "networkSecurityGroupRules": [
+      {
+        "name": "RDP",
+        "properties": {
+          "priority": 300,
+          "protocol": "TCP",
+          "access": "Allow",
+          "direction": "Inbound",
+          "sourceAddressPrefix": "*",
+          "sourcePortRange": "*",
+          "destinationAddressPrefix": "*",
+          "destinationPortRange": "3389"
+        }
+      },
+      {
+        "name": "HTTPS",
+        "properties": {
+          "priority": 320,
+          "protocol": "TCP",
+          "access": "Allow",
+          "direction": "Inbound",
+          "sourceAddressPrefix": "*",
+          "sourcePortRange": "*",
+          "destinationAddressPrefix": "*",
+          "destinationPortRange": "443"
+        }
+      },
+      {
+        "name": "HTTP",
+        "properties": {
+          "priority": 340,
+          "protocol": "TCP",
+          "access": "Allow",
+          "direction": "Inbound",
+          "sourceAddressPrefix": "*",
+          "sourcePortRange": "*",
+          "destinationAddressPrefix": "*",
+          "destinationPortRange": "80"
+        }
+      }
+    ],
+    "dataDiskName": "[concat(parameters('virtualMachineName'), '_DataDisk_0')]"
+  },
+  "resources": [
+    {
+      "name": "[variables('networkInterfaceName')]",
+      "type": "Microsoft.Network/networkInterfaces",
+      "apiVersion": "2018-04-01",
+      "location": "[variables('location')]",
+      "dependsOn": [
+        "[concat('Microsoft.Network/networkSecurityGroups/', variables('networkSecurityGroupName'))]",
+        "[concat('Microsoft.Network/virtualNetworks/', variables('virtualNetworkName'))]",
+        "[concat('Microsoft.Network/publicIpAddresses/', variables('publicIpAddressName'))]"
+      ],
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig1",
+            "properties": {
+              "subnet": {
+                "id": "[variables('subnetRef')]"
+              },
+              "privateIPAllocationMethod": "Dynamic",
+              "publicIpAddress": {
+                "id": "[resourceId(variables('rgName'), 'Microsoft.Network/publicIpAddresses', variables('publicIpAddressName'))]"
+              }
+            }
+          }
+        ],
+        "networkSecurityGroup": {
+          "id": "[variables('nsgId')]"
+        }
+      },
+      "tags": "[variables('tags')]"
+    },
+    {
+      "name": "[variables('networkSecurityGroupName')]",
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "apiVersion": "2018-08-01",
+      "location": "[variables('location')]",
+      "properties": {
+        "securityRules": "[variables('networkSecurityGroupRules')]"
+      },
+      "tags": "[variables('tags')]"
+    },
+    {
+      "name": "[variables('virtualNetworkName')]",
+      "type": "Microsoft.Network/virtualNetworks",
+      "apiVersion": "2018-08-01",
+      "location": "[variables('location')]",
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "10.0.0.0/24"
+          ]
+        },
+        "subnets": [
+          {
+            "name": "default",
+            "properties": {
+              "addressPrefix": "10.0.0.0/24"
+            }
+          }
+        ]
+      },
+      "tags": "[variables('tags')]"
+    },
+    {
+      "name": "[variables('publicIpAddressName')]",
+      "type": "Microsoft.Network/publicIpAddresses",
+      "apiVersion": "2018-08-01",
+      "location": "[variables('location')]",
+      "properties": {
+        "publicIpAllocationMethod": "Dynamic",
+        "dnsSettings": {
+          "domainNameLabel": "brendondevmachine"
+        }
+      },
+      "sku": {
+        "name": "Basic"
+      },
+      "tags": "[variables('tags')]"
+    },
+    {
+      "name": "[variables('dataDiskName')]",
+      "type": "Microsoft.Compute/disks",
+      "apiVersion": "2018-06-01",
+      "location": "[variables('location')]",
+      "properties": {
+        "diskSizeGB": "[parameters('dataDiskSize')]",
+        "creationData": {
+          "createOption": "empty"
+        }
+      },
+      "sku": {
+        "name": "[parameters('storageAccountType')]"
+      },
+      "tags": "[variables('tags')]"
+    },
+    {
+      "name": "[parameters('virtualMachineName')]",
+      "type": "Microsoft.Compute/virtualMachines",
+      "apiVersion": "2018-06-01",
+      "location": "[variables('location')]",
+      "dependsOn": [
+        "[concat('Microsoft.Compute/disks/', variables('dataDiskName'))]",
+        "[concat('Microsoft.Network/networkInterfaces/', variables('networkInterfaceName'))]",
+        "[concat('Microsoft.Storage/storageAccounts/', variables('diagnosticsStorageAccountName'))]"
+      ],
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "[parameters('virtualMachineSize')]"
+        },
+        "storageProfile": {
+          "osDisk": {
+            "createOption": "fromImage",
+            "managedDisk": {
+              "storageAccountType": "[parameters('storageAccountType')]"
+            }
+          },
+          "imageReference": "[parameters('imageReference')]",
+          "dataDisks": [
+            {
+              "lun": 0,
+              "createOption": "Attach",
+              "caching": "ReadOnly",
+              "writeAcceleratorEnabled": false,
+              "managedDisk": {
+                "id": "[resourceId('Microsoft.Compute/disks', variables('dataDiskName'))]",
+                "storageAccountType": "[parameters('storageAccountType')]"
+              }
+            }
+          ]
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('networkInterfaceName'))]"
+            }
+          ]
+        },
+        "osProfile": {
+          "computerName": "[parameters('virtualMachineName')]",
+          "adminUsername": "[parameters('adminUsername')]",
+          "adminPassword": "[parameters('adminPassword')]",
+          "windowsConfiguration": {
+            "enableAutomaticUpdates": true,
+            "provisionVmAgent": true
+          }
+        },
+        "licenseType": "Windows_Client",
+        "diagnosticsProfile": {
+          "bootDiagnostics": {
+            "enabled": true,
+            "storageUri": "[reference(variables('diagnosticsStorageAccountName')).primaryEndpoints.blob]"
+          }
+        }
+      },
+      "tags": "[variables('tags')]"
+    },
+    {
+      "name": "[variables('diagnosticsStorageAccountName')]",
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2018-07-01",
+      "location": "[variables('location')]",
+      "properties": {},
+      "kind": "Storage",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "tags": "[variables('tags')]"
+    },
+    {
+      "name": "[concat('shutdown-computevm-', parameters('virtualMachineName'))]",
+      "type": "Microsoft.DevTestLab/schedules",
+      "apiVersion": "2017-04-26-preview",
+      "location": "[variables('location')]",
+      "dependsOn": [
+        "[concat('Microsoft.Compute/virtualMachines/', parameters('virtualMachineName'))]"
+      ],
+      "properties": {
+        "status": "[variables('autoShutdownStatus')]",
+        "taskType": "ComputeVmShutdownTask",
+        "dailyRecurrence": {
+          "time": "[variables('autoShutdownTime')]"
+        },
+        "timeZoneId": "[variables('autoShutdownTimeZone')]",
+        "targetResourceId": "[resourceId('Microsoft.Compute/virtualMachines', parameters('virtualMachineName'))]",
+        "notificationSettings": {
+          "status": "[variables('autoShutdownNotificationStatus')]",
+          "notificationLocale": "en",
+          "timeInMinutes": "[variables('autoShutdownNotificationTimeInMinutes')]"
+        }
+      },
+      "tags": "[variables('tags')]"
+    }
+  ],
+  "outputs": {
+    "adminUsername": {
+      "type": "string",
+      "value": "[parameters('adminUsername')]"
+    },
+    "vmMachineName": {
+      "type": "string",
+      "value": "[parameters('virtualMachineName')]"
+    },
+    "imageReference": {
+      "type": "object",
+      "value": "[parameters('imageReference')]"
+    }
+  }
+}

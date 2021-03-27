@@ -1,0 +1,23 @@
+name: $(TeamProject)_$(BuildDefinitionName)_$(SourceBranchName)_$(Date:yyyyMMdd).$(Rev:.r)
+
+trigger:
+  batch: true
+  branches:
+    include:
+    - master
+
+jobs:
+- job: PackageDSC
+  displayName: Package Source Code
+  pool: HOJ
+  continueOnError: false
+  workspace:
+    clean: outputs
+  steps:
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      PathtoPublish: '.\'
+      ArtifactName: 'source'
+      ArtifactType: 'Container'
+    displayName: 'Publish source code'

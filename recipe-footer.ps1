@@ -1,0 +1,3 @@
+Enable-UAC
+Enable-MicrosoftUpdate
+

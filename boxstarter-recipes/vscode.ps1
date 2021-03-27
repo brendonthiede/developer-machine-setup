@@ -1,0 +1,11 @@
+cinst vscode --cacheLocation "$env:USERPROFILE\AppData\Local\ChocoCache"
+cinst vscode-powershell --cacheLocation "$env:USERPROFILE\AppData\Local\ChocoCache"
+cinst vscode-csharp --cacheLocation "$env:USERPROFILE\AppData\Local\ChocoCache"
+cinst vscode-gitlens --cacheLocation "$env:USERPROFILE\AppData\Local\ChocoCache"
+cinst vscode-azurerm-tools --cacheLocation "$env:USERPROFILE\AppData\Local\ChocoCache"
+cinst vscode-markdownlint --cacheLocation "$env:USERPROFILE\AppData\Local\ChocoCache"
+cinst vscode-eslint --cacheLocation "$env:USERPROFILE\AppData\Local\ChocoCache"
+cinst vscode-gitignore --cacheLocation "$env:USERPROFILE\AppData\Local\ChocoCache"
+cinst vscode-mssql --cacheLocation "$env:USERPROFILE\AppData\Local\ChocoCache"
+cinst vscode-docker --cacheLocation "$env:USERPROFILE\AppData\Local\ChocoCache"
+
